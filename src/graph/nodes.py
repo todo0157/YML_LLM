@@ -20,7 +20,7 @@ from .prompts import (
 def get_llm():
     """Gemini LLM 인스턴스 반환"""
     return ChatGoogleGenerativeAI(
-        model="gemini-1.5-flash-8b",
+        model="gemini-pro",
         temperature=0,
         max_tokens=4096,
         google_api_key=os.getenv("GOOGLE_API_KEY")
