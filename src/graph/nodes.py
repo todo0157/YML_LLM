@@ -1,11 +1,10 @@
 """
-LangGraph 노드 구현 - Gemini 버전
+LangGraph 노드 구현 - Gemini 버전 (google-generativeai 직접 사용)
 """
 import json
 import os
 from typing import Any
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_core.messages import HumanMessage, SystemMessage
+import google.generativeai as genai
 
 from .state import AgentState, ResearchPlan, SearchResult, ParameterRecommendation
 from .prompts import (
@@ -16,30 +15,38 @@ from .prompts import (
     FINAL_RESPONSE_TEMPLATE
 )
 
+# Gemini API 설정
+genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
-def get_llm():
-    """Gemini LLM 인스턴스 반환"""
-    return ChatGoogleGenerativeAI(
-        model="gemini-pro",
-        temperature=0,
-        max_tokens=4096,
-        google_api_key=os.getenv("GOOGLE_API_KEY")
+
+def get_model():
+    """Gemini 모델 인스턴스 반환"""
+    return genai.GenerativeModel(
+        model_name="gemini-1.5-flash",
+        generation_config={
+            "temperature": 0,
+            "max_output_tokens": 4096,
+        }
     )
+
+
+async def call_gemini(prompt: str) -> str:
+    """Gemini API 비동기 호출"""
+    model = get_model()
+    response = await model.generate_content_async(prompt)
+    return response.text
 
 
 async def parse_query(state: AgentState) -> dict[str, Any]:
     """사용자 쿼리 분석 및 연구 계획 수립"""
-    llm = get_llm()
-
-    # Gemini는 system message를 human message에 포함
     combined_prompt = f"""{QUERY_PARSER_PROMPT}
 
 분석할 질문: {state['original_query']}"""
 
-    response = await llm.ainvoke([HumanMessage(content=combined_prompt)])
+    response_text = await call_gemini(combined_prompt)
 
     try:
-        content = response.content
+        content = response_text
         if "```json" in content:
             content = content.split("```json")[1].split("```")[0]
         elif "```" in content:
@@ -182,8 +189,6 @@ async def paper_search(state: AgentState) -> dict[str, Any]:
 
 async def evaluate_results(state: AgentState) -> dict[str, Any]:
     """검색 결과 충분성 평가"""
-    llm = get_llm()
-
     all_results = (
         state.get("web_results", []) +
         state.get("kb_results", []) +
@@ -211,10 +216,10 @@ async def evaluate_results(state: AgentState) -> dict[str, Any]:
 수집된 정보 ({len(all_results)}개):
 {results_summary}"""
 
-    response = await llm.ainvoke([HumanMessage(content=combined_prompt)])
+    response_text = await call_gemini(combined_prompt)
 
     try:
-        content = response.content
+        content = response_text
         if "```json" in content:
             content = content.split("```json")[1].split("```")[0]
         elif "```" in content:
@@ -239,8 +244,6 @@ async def evaluate_results(state: AgentState) -> dict[str, Any]:
 
 async def refine_query(state: AgentState) -> dict[str, Any]:
     """쿼리 재구성"""
-    llm = get_llm()
-
     missing_info = state.get("missing_info", [])
     plan = state.get("research_plan")
 
@@ -254,10 +257,10 @@ async def refine_query(state: AgentState) -> dict[str, Any]:
 원래 질문: {state['original_query']}
 현재 쿼리들: {plan.sub_queries}"""
 
-    response = await llm.ainvoke([HumanMessage(content=combined_prompt)])
+    response_text = await call_gemini(combined_prompt)
 
     try:
-        content = response.content
+        content = response_text
         if "```json" in content:
             content = content.split("```json")[1].split("```")[0]
         elif "```" in content:
@@ -281,8 +284,6 @@ async def refine_query(state: AgentState) -> dict[str, Any]:
 
 async def synthesize(state: AgentState) -> dict[str, Any]:
     """수집된 정보 종합 및 추론"""
-    llm = get_llm()
-
     all_results = (
         state.get("web_results", []) +
         state.get("kb_results", []) +
@@ -304,10 +305,10 @@ async def synthesize(state: AgentState) -> dict[str, Any]:
 수집된 정보:
 {results_text}"""
 
-    response = await llm.ainvoke([HumanMessage(content=combined_prompt)])
+    response_text = await call_gemini(combined_prompt)
 
     try:
-        content = response.content
+        content = response_text
         if "```json" in content:
             content = content.split("```json")[1].split("```")[0]
         elif "```" in content:
@@ -320,7 +321,7 @@ async def synthesize(state: AgentState) -> dict[str, Any]:
             for r in synth_data.get("recommendations", [])
         ]
     except Exception as e:
-        synthesized = response.content
+        synthesized = response_text
         recommendations = []
 
     return {

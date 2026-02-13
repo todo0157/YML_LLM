@@ -1,7 +1,6 @@
 # Core
 langgraph>=0.2.0
 langchain>=0.3.0
-langchain-google-genai==1.0.10
 langchain-community>=0.3.0
 
 # Web Search
@@ -18,4 +17,4 @@ httpx>=0.27.0
 aiohttp>=3.10.0
 
 # Google AI
-google-generativeai>=0.7.0,<0.8.0
+google-generativeai>=0.8.0
