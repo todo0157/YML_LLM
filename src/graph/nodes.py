@@ -32,7 +32,7 @@ async def call_gemini(prompt: str) -> str:
     import asyncio
     configure_genai()
     model = genai.GenerativeModel(
-        model_name="gemini-1.5-flash",
+        model_name="gemini-1.5-flash-latest",
         generation_config={
             "temperature": 0,
             "max_output_tokens": 4096,
