@@ -5,6 +5,7 @@ import json
 import os
 from typing import Any
 from google import genai
+from google.genai import types
 
 from .state import AgentState, ResearchPlan, SearchResult, ParameterRecommendation
 from .prompts import (
@@ -33,10 +34,10 @@ async def call_gemini(prompt: str) -> str:
     response = await client.aio.models.generate_content(
         model="gemini-1.5-flash",
         contents=prompt,
-        config={
-            "temperature": 0,
-            "max_output_tokens": 4096,
-        }
+        config=types.GenerateContentConfig(
+            temperature=0,
+            max_output_tokens=4096,
+        )
     )
     return response.text
 
