@@ -3,7 +3,12 @@ FastAPI 서버
 """
 import os
 import sys
+import logging
 from pathlib import Path
+
+# 로깅 설정
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # 프로젝트 루트를 path에 추가
 project_root = Path(__file__).parent.parent.parent
@@ -118,7 +123,9 @@ async def research(query: ResearchQuery):
             enhanced_query = f"{enhanced_query} (현재 설정: {params_str})"
 
         # 연구 실행
+        logger.info(f"Starting research for query: {enhanced_query}")
         response = await run_research(enhanced_query)
+        logger.info("Research completed successfully")
 
         return ResearchResponse(
             response=response,
@@ -126,6 +133,7 @@ async def research(query: ResearchQuery):
             success=True
         )
     except Exception as e:
+        logger.error(f"Research error: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
