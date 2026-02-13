@@ -1,11 +1,10 @@
 """
-LangGraph 노드 구현
+LangGraph 노드 구현 - Gemini 버전
 """
 import json
 import os
 from typing import Any
-from langchain_anthropic import ChatAnthropic
-from langchain_openai import ChatOpenAI
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from .state import AgentState, ResearchPlan, SearchResult, ParameterRecommendation
@@ -19,35 +18,28 @@ from .prompts import (
 
 
 def get_llm():
-    """LLM 인스턴스 반환"""
-    provider = os.getenv("LLM_PROVIDER", "anthropic")
-
-    if provider == "anthropic":
-        return ChatAnthropic(
-            model="claude-sonnet-4-20250514",
-            temperature=0,
-            max_tokens=4096
-        )
-    else:
-        return ChatOpenAI(
-            model="gpt-4o",
-            temperature=0
-        )
+    """Gemini LLM 인스턴스 반환"""
+    return ChatGoogleGenerativeAI(
+        model="gemini-1.5-flash",
+        temperature=0,
+        max_tokens=4096,
+        google_api_key=os.getenv("GOOGLE_API_KEY")
+    )
 
 
 async def parse_query(state: AgentState) -> dict[str, Any]:
     """사용자 쿼리 분석 및 연구 계획 수립"""
     llm = get_llm()
 
-    response = await llm.ainvoke([
-        SystemMessage(content=QUERY_PARSER_PROMPT),
-        HumanMessage(content=f"분석할 질문: {state['original_query']}")
-    ])
+    # Gemini는 system message를 human message에 포함
+    combined_prompt = f"""{QUERY_PARSER_PROMPT}
+
+분석할 질문: {state['original_query']}"""
+
+    response = await llm.ainvoke([HumanMessage(content=combined_prompt)])
 
     try:
-        # JSON 파싱 시도
         content = response.content
-        # 코드 블록 제거
         if "```json" in content:
             content = content.split("```json")[1].split("```")[0]
         elif "```" in content:
@@ -56,7 +48,6 @@ async def parse_query(state: AgentState) -> dict[str, Any]:
         plan_data = json.loads(content.strip())
         research_plan = ResearchPlan(**plan_data)
     except Exception as e:
-        # 파싱 실패 시 기본 계획
         research_plan = ResearchPlan(
             main_query=state['original_query'],
             sub_queries=[state['original_query']],
@@ -82,7 +73,6 @@ async def web_search(state: AgentState) -> dict[str, Any]:
         return {"web_results": [], "errors": ["No research plan"]}
 
     try:
-        # 각 서브 쿼리에 대해 검색
         for query in plan.sub_queries[:3]:
             search_results = await search_3d_printing_web(query)
             for r in search_results:
@@ -112,7 +102,6 @@ async def kb_search(state: AgentState) -> dict[str, Any]:
     try:
         kb = KnowledgeBase()
 
-        # 재료별 가이드 검색
         if plan.material_type:
             material_results = kb.get_material_guide(plan.material_type)
             if material_results:
@@ -124,7 +113,6 @@ async def kb_search(state: AgentState) -> dict[str, Any]:
                     relevance_score=0.9
                 ))
 
-        # 결함 해결 가이드 검색
         if plan.defect_type:
             defect_results = kb.get_defect_solution(plan.defect_type)
             if defect_results:
@@ -136,7 +124,6 @@ async def kb_search(state: AgentState) -> dict[str, Any]:
                     relevance_score=0.9
                 ))
 
-        # 유사 실험 데이터 검색
         similar_experiments = kb.search_similar_experiments(
             material=plan.material_type,
             defect=plan.defect_type
@@ -165,7 +152,6 @@ async def paper_search(state: AgentState) -> dict[str, Any]:
     if not plan:
         return {"paper_results": []}
 
-    # 학술 검색이 전략에 포함된 경우에만 실행
     if "paper" not in plan.search_strategies:
         return {"paper_results": []}
 
@@ -213,21 +199,19 @@ async def evaluate_results(state: AgentState) -> dict[str, Any]:
             "iteration_count": state.get("iteration_count", 0) + 1
         }
 
-    # 결과 요약 생성
     results_summary = "\n\n".join([
         f"[{r.source}] {r.title}\n{r.content[:300]}..."
         for r in all_results[:10]
     ])
 
-    response = await llm.ainvoke([
-        SystemMessage(content=EVALUATOR_PROMPT),
-        HumanMessage(content=f"""
+    combined_prompt = f"""{EVALUATOR_PROMPT}
+
 질문: {state['original_query']}
 
 수집된 정보 ({len(all_results)}개):
-{results_summary}
-""")
-    ])
+{results_summary}"""
+
+    response = await llm.ainvoke([HumanMessage(content=combined_prompt)])
 
     try:
         content = response.content
@@ -241,7 +225,6 @@ async def evaluate_results(state: AgentState) -> dict[str, Any]:
         confidence = eval_data.get("confidence", 0.5)
         missing = eval_data.get("missing", [])
     except:
-        # 결과 수에 기반한 기본 평가
         is_sufficient = len(all_results) >= 5
         confidence = min(len(all_results) * 0.1, 0.8)
         missing = []
@@ -266,13 +249,12 @@ async def refine_query(state: AgentState) -> dict[str, Any]:
 
     prompt = REFINER_PROMPT.format(missing_info=", ".join(missing_info))
 
-    response = await llm.ainvoke([
-        SystemMessage(content=prompt),
-        HumanMessage(content=f"""
+    combined_prompt = f"""{prompt}
+
 원래 질문: {state['original_query']}
-현재 쿼리들: {plan.sub_queries}
-""")
-    ])
+현재 쿼리들: {plan.sub_queries}"""
+
+    response = await llm.ainvoke([HumanMessage(content=combined_prompt)])
 
     try:
         content = response.content
@@ -284,7 +266,6 @@ async def refine_query(state: AgentState) -> dict[str, Any]:
         new_data = json.loads(content.strip())
         new_queries = new_data.get("new_queries", [])
 
-        # 기존 쿼리에 새 쿼리 추가
         updated_plan = ResearchPlan(
             main_query=plan.main_query,
             sub_queries=plan.sub_queries + new_queries,
@@ -309,7 +290,6 @@ async def synthesize(state: AgentState) -> dict[str, Any]:
         state.get("community_results", [])
     )
 
-    # 관련도 순으로 정렬
     sorted_results = sorted(all_results, key=lambda x: x.relevance_score, reverse=True)
 
     results_text = "\n\n".join([
@@ -317,15 +297,14 @@ async def synthesize(state: AgentState) -> dict[str, Any]:
         for r in sorted_results[:15]
     ])
 
-    response = await llm.ainvoke([
-        SystemMessage(content=SYNTHESIZER_PROMPT),
-        HumanMessage(content=f"""
+    combined_prompt = f"""{SYNTHESIZER_PROMPT}
+
 질문: {state['original_query']}
 
 수집된 정보:
-{results_text}
-""")
-    ])
+{results_text}"""
+
+    response = await llm.ainvoke([HumanMessage(content=combined_prompt)])
 
     try:
         content = response.content
@@ -340,11 +319,9 @@ async def synthesize(state: AgentState) -> dict[str, Any]:
             ParameterRecommendation(**r)
             for r in synth_data.get("recommendations", [])
         ]
-        additional_tips = synth_data.get("additional_tips", [])
     except Exception as e:
         synthesized = response.content
         recommendations = []
-        additional_tips = []
 
     return {
         "synthesized_knowledge": synthesized,
@@ -354,7 +331,6 @@ async def synthesize(state: AgentState) -> dict[str, Any]:
 
 async def validate(state: AgentState) -> dict[str, Any]:
     """추천 검증"""
-    # 파라미터 범위 검증
     VALID_RANGES = {
         "노즐 온도": (180, 300),
         "nozzle_temp": (180, 300),
@@ -373,11 +349,10 @@ async def validate(state: AgentState) -> dict[str, Any]:
     validated_recommendations = []
     for rec in state.get("recommendations", []):
         try:
-            # 단위 제거 후 숫자 추출
             value_str = rec.recommended_value
             for unit in ["°C", "mm/s", "mm", "%"]:
                 value_str = value_str.replace(unit, "")
-            value_str = value_str.strip().split("-")[0]  # 범위인 경우 첫 값
+            value_str = value_str.strip().split("-")[0]
             value = float(value_str)
 
             param_range = VALID_RANGES.get(rec.parameter)
@@ -386,7 +361,6 @@ async def validate(state: AgentState) -> dict[str, Any]:
                 if param_range[0] <= value <= param_range[1]:
                     validated_recommendations.append(rec)
                 else:
-                    # 범위 벗어나면 경고 추가
                     rec.confidence *= 0.5
                     rec.reasoning += f" (주의: 일반적 범위 {param_range[0]}-{param_range[1]} 벗어남)"
                     validated_recommendations.append(rec)
@@ -407,7 +381,6 @@ async def generate_output(state: AgentState) -> dict[str, Any]:
         state.get("paper_results", [])
     )
 
-    # 소스 목록 (중복 제거)
     unique_sources = []
     seen_urls = set()
     for r in all_results:
@@ -416,7 +389,6 @@ async def generate_output(state: AgentState) -> dict[str, Any]:
             seen_urls.add(r.url)
     unique_sources = unique_sources[:8]
 
-    # 추천 테이블 생성
     if recommendations:
         rec_table = "| 파라미터 | 현재값 | 추천값 | 신뢰도 |\n"
         rec_table += "|----------|--------|--------|--------|\n"
@@ -426,13 +398,11 @@ async def generate_output(state: AgentState) -> dict[str, Any]:
     else:
         rec_table = "추천을 생성할 수 없습니다."
 
-    # 상세 설명
     detailed = "\n\n".join([
         f"**{r.parameter}**: {r.reasoning}"
         for r in recommendations[:5]
     ])
 
-    # 소스 포맷팅
     sources_formatted = "\n".join([
         f"[{i+1}] {url}"
         for i, url in enumerate(unique_sources)
@@ -460,6 +430,6 @@ def should_continue_research(state: AgentState) -> str:
     if state.get("is_sufficient", False):
         return "synthesize"
     elif state.get("iteration_count", 0) >= 3:
-        return "synthesize"  # 최대 3회 반복
+        return "synthesize"
     else:
         return "refine"
