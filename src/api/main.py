@@ -105,6 +105,24 @@ async def health():
     return {"status": "healthy"}
 
 
+@app.get("/debug/models")
+async def list_models():
+    """사용 가능한 Gemini 모델 목록 (디버그용)"""
+    try:
+        from google import genai
+        client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
+        models = []
+        for model in client.models.list():
+            models.append({
+                "name": model.name,
+                "display_name": getattr(model, 'display_name', None),
+                "supported_actions": getattr(model, 'supported_generation_methods', None)
+            })
+        return {"models": models, "count": len(models)}
+    except Exception as e:
+        return {"error": str(e)}
+
+
 @app.post("/research", response_model=ResearchResponse)
 async def research(query: ResearchQuery):
     """
