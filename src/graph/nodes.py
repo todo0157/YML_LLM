@@ -31,7 +31,7 @@ async def call_gemini(prompt: str) -> str:
     """Gemini API 비동기 호출"""
     client = get_client()
     response = await client.aio.models.generate_content(
-        model="gemini-2.0-flash-exp",
+        model="gemini-1.5-flash",
         contents=prompt,
         config={
             "temperature": 0,
