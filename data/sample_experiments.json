@@ -1,0 +1,116 @@
+[
+  {
+    "experiment_id": "EXP_001",
+    "material": {"type": "PLA", "brand": "eSUN"},
+    "parameters": {
+      "nozzle_temp": 210,
+      "bed_temp": 60,
+      "layer_height": 0.2,
+      "print_speed": 60,
+      "retraction_distance": 5.0,
+      "retraction_speed": 45,
+      "fan_speed": 100
+    },
+    "result": {
+      "quality_score": 8,
+      "defects": [],
+      "notes": "양호한 출력 품질"
+    },
+    "optimized_params": null
+  },
+  {
+    "experiment_id": "EXP_002",
+    "material": {"type": "PLA", "brand": "eSUN"},
+    "parameters": {
+      "nozzle_temp": 220,
+      "bed_temp": 60,
+      "layer_height": 0.2,
+      "print_speed": 60,
+      "retraction_distance": 4.0,
+      "retraction_speed": 25,
+      "fan_speed": 100
+    },
+    "result": {
+      "quality_score": 5,
+      "defects": ["stringing"],
+      "notes": "온도 과열로 인한 stringing 발생"
+    },
+    "optimized_params": {
+      "nozzle_temp": 200,
+      "retraction_distance": 6.0,
+      "retraction_speed": 45,
+      "reason": "온도 낮추고 retraction 강화"
+    }
+  },
+  {
+    "experiment_id": "EXP_003",
+    "material": {"type": "PETG", "brand": "Overture"},
+    "parameters": {
+      "nozzle_temp": 240,
+      "bed_temp": 70,
+      "layer_height": 0.2,
+      "print_speed": 50,
+      "retraction_distance": 4.0,
+      "retraction_speed": 30,
+      "fan_speed": 50
+    },
+    "result": {
+      "quality_score": 4,
+      "defects": ["stringing", "blob"],
+      "notes": "PETG 특유의 stringing 심함"
+    },
+    "optimized_params": {
+      "nozzle_temp": 225,
+      "retraction_distance": 6.0,
+      "retraction_speed": 40,
+      "reason": "PETG는 온도에 민감, retraction 증가 필요"
+    }
+  },
+  {
+    "experiment_id": "EXP_004",
+    "material": {"type": "ABS", "brand": "Hatchbox"},
+    "parameters": {
+      "nozzle_temp": 235,
+      "bed_temp": 100,
+      "layer_height": 0.2,
+      "print_speed": 50,
+      "retraction_distance": 4.0,
+      "retraction_speed": 40,
+      "fan_speed": 0
+    },
+    "result": {
+      "quality_score": 6,
+      "defects": ["warping"],
+      "notes": "인클로저 없이 출력, 모서리 warping"
+    },
+    "optimized_params": {
+      "bed_temp": 110,
+      "print_speed": 40,
+      "reason": "베드 온도 높이고 속도 낮춤, brim 추가 권장"
+    }
+  },
+  {
+    "experiment_id": "EXP_005",
+    "material": {"type": "PETG", "brand": "Overture"},
+    "parameters": {
+      "nozzle_temp": 230,
+      "bed_temp": 75,
+      "layer_height": 0.2,
+      "print_speed": 45,
+      "retraction_distance": 5.0,
+      "retraction_speed": 35,
+      "fan_speed": 40
+    },
+    "result": {
+      "quality_score": 3,
+      "defects": ["layer_adhesion"],
+      "notes": "첫 레이어 접착 불량, 베드에서 떨어짐"
+    },
+    "optimized_params": {
+      "bed_temp": 85,
+      "first_layer_speed": 20,
+      "flow_rate": 105,
+      "reason": "베드 온도 높이고 첫 레이어 속도 낮춤, flow 증가"
+    }
+  }
+]
