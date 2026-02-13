@@ -1,5 +1,5 @@
 """
-LangGraph 노드 구현 - Gemini 버전 (google-genai 패키지 사용)
+LangGraph 노드 구현 - Gemini 버전 (google-generativeai 패키지 사용)
 """
 import json
 import os
