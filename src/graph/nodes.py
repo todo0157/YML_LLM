@@ -4,8 +4,7 @@ LangGraph 노드 구현 - Gemini 버전 (google-genai 패키지 사용)
 import json
 import os
 from typing import Any
-from google import genai
-from google.genai import types
+import google.generativeai as genai
 
 from .state import AgentState, ResearchPlan, SearchResult, ParameterRecommendation
 from .prompts import (
@@ -16,28 +15,34 @@ from .prompts import (
     FINAL_RESPONSE_TEMPLATE
 )
 
-# Gemini API 클라이언트
-_client = None
+# Gemini API 설정
+_configured = False
 
 
-def get_client():
-    """Gemini API 클라이언트 반환"""
-    global _client
-    if _client is None:
-        _client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
-    return _client
+def configure_genai():
+    """Gemini API 설정"""
+    global _configured
+    if not _configured:
+        genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+        _configured = True
 
 
 async def call_gemini(prompt: str) -> str:
-    """Gemini API 비동기 호출"""
-    client = get_client()
-    response = await client.aio.models.generate_content(
-        model="gemini-1.5-flash",
-        contents=prompt,
-        config=types.GenerateContentConfig(
-            temperature=0,
-            max_output_tokens=4096,
-        )
+    """Gemini API 호출 (동기 방식을 asyncio로 래핑)"""
+    import asyncio
+    configure_genai()
+    model = genai.GenerativeModel(
+        model_name="gemini-1.5-flash",
+        generation_config={
+            "temperature": 0,
+            "max_output_tokens": 4096,
+        }
+    )
+    # 동기 호출을 별도 스레드에서 실행
+    loop = asyncio.get_event_loop()
+    response = await loop.run_in_executor(
+        None,
+        lambda: model.generate_content(prompt)
     )
     return response.text
 
