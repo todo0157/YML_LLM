@@ -81,7 +81,7 @@ def run_server(port: int = 8000):
 
 def check_env():
     """환경 변수 확인"""
-    required = ["ANTHROPIC_API_KEY", "TAVILY_API_KEY"]
+    required = ["GOOGLE_API_KEY", "TAVILY_API_KEY"]
     missing = []
 
     for var in required:
@@ -94,7 +94,7 @@ def check_env():
             print(f"  - {var}")
         print("\n.env 파일을 생성하거나 환경 변수를 설정하세요.")
         print("예시:")
-        print('  export ANTHROPIC_API_KEY="your-key"')
+        print('  export GOOGLE_API_KEY="your-key"')
         print('  export TAVILY_API_KEY="your-key"')
         return False
 

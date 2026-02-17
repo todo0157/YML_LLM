@@ -30,11 +30,25 @@ def get_client():
 async def call_gemini(prompt: str) -> str:
     """Gemini API 비동기 호출"""
     client = get_client()
-    response = await client.aio.models.generate_content(
-        model="gemini-2.0-flash",
-        contents=prompt
-    )
-    return response.text
+    primary_model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+    fallback_models = ["gemini-2.0-flash", "gemini-flash-latest"]
+    model_candidates = [primary_model] + [m for m in fallback_models if m != primary_model]
+
+    last_error = None
+    for model_name in model_candidates:
+        try:
+            response = await client.aio.models.generate_content(
+                model=model_name,
+                contents=prompt
+            )
+            return response.text
+        except Exception as e:
+            last_error = e
+            if "NOT_FOUND" in str(e) or "is not found" in str(e):
+                continue
+            raise
+
+    raise last_error if last_error else RuntimeError("Gemini call failed")
 
 
 async def parse_query(state: AgentState) -> dict[str, Any]:
