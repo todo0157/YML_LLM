@@ -147,3 +147,117 @@ response = await client.aio.models.generate_content(
 2. If needed, switch Render `GOOGLE_API_KEY` to a project with available quota.
 3. Re-test `POST /research` after quota recovery or key switch.
 4. If quota issues are frequent, add graceful 429 handling/message in API and frontend UI.
+
+---
+
+## Session Update (2026-02-18)
+
+### What was done in this session
+- 로컬 서버 실행 시도
+- Python 경로 문제 해결: `C:\Users\thf56\AppData\Local\Programs\Python\Python313\python.exe` 사용
+- 프론트엔드 `.env.local` 수정: `VITE_API_ENDPOINT=http://localhost:8000` (로컬 테스트용)
+- 백엔드 서버 실행 성공 (포트 8000)
+- 프론트엔드 서버 실행 성공 (포트 5175)
+
+### 발견된 문제
+- 백엔드 `/research` 엔드포인트 500 에러 발생
+- 원인: **GOOGLE_API_KEY가 유효하지 않음** (만료 또는 삭제됨)
+- 에러 메시지: `400 INVALID_ARGUMENT. API Key not found. Please pass a valid API key.`
+
+### 다음 세션에서 할 작업
+1. [Google AI Studio](https://aistudio.google.com/apikey)에서 새 GOOGLE_API_KEY 발급
+2. `.env` 파일에 새 API 키 설정
+3. 백엔드 서버 재시작
+4. 로컬 테스트 진행 (프론트엔드 -> 백엔드 -> Gemini API)
+5. 정상 동작 확인 후 Render 환경변수도 업데이트
+
+### 로컬 서버 실행 명령어
+```bash
+# 백엔드 (포트 8000)
+cd 3d-print-research-agent
+C:\Users\thf56\AppData\Local\Programs\Python\Python313\python.exe run.py server
+
+# 프론트엔드 (Vite)
+cd 3d-print-research-agent/frontend
+npm run dev
+```
+
+### 현재 설정 상태
+- `frontend/.env.local`: `VITE_API_ENDPOINT=http://localhost:8000` (로컬 테스트용)
+- `frontend/.env.production`: `VITE_API_ENDPOINT=https://yml-llm.onrender.com` (배포용)
+
+---
+
+## Session Update (2026-02-19)
+
+### 완료된 작업
+- [x] 새 GOOGLE_API_KEY 발급 및 `.env` 설정 완료
+- [x] 로컬 백엔드 서버 시작 및 테스트 성공 (포트 8000)
+- [x] 로컬 프론트엔드 서버 시작 성공 (포트 5173)
+- [x] Gemini API 연동 확인 (45개 모델 사용 가능)
+- [x] `/research` API 테스트 성공 (PLA, ABS 온도 분석 완료)
+- [x] Render 환경변수 `GOOGLE_API_KEY` 업데이트 및 재배포
+- [x] Render 백엔드 정상 동작 확인 (`/health`, `/debug/models`, `/research` 모두 OK)
+- [x] UI 깨짐 문제 수정 (긴 URL 줄바꿈 처리)
+
+### UI 수정 내용
+**문제**: 참고 소스 URL이 너무 길어서 레이아웃 깨짐
+
+**수정 파일**:
+1. `frontend/src/App.css`:
+   - `.message-content`에 `word-break: break-word` 추가
+   - `.sources a`, `.message-content a`에 `word-break: break-all` 추가
+2. `frontend/src/App.tsx`:
+   - ReactMarkdown에 커스텀 링크 컴포넌트 추가 (40자 초과 시 truncate)
+
+### 현재 상태
+| 구성 요소 | 상태 | URL |
+|-----------|------|-----|
+| Render 백엔드 | ✅ 정상 | https://yml-llm.onrender.com |
+| Cloudflare 프론트엔드 | ✅ 정상 | https://3d-print-agent.pages.dev |
+| Gemini API | ✅ 연결됨 | 45개 모델 사용 가능 |
+| /research API | ✅ 성공 | 정상 응답 |
+
+### 다음 세션에서 할 작업
+1. **CSV 데이터를 Knowledge Base에 추가**
+   - 사용자의 3D 프린팅 실험 데이터 (수십 개)
+   - CSV → JSON 변환 스크립트 작성
+   - `data/sample_experiments.json`에 추가
+2. Cloudflare Pages 재배포 (UI 수정 반영)
+
+### Knowledge Base 데이터 형식 참고
+```json
+{
+  "experiment_id": "EXP_XXX",
+  "material": {"type": "PLA", "brand": "브랜드명"},
+  "parameters": {
+    "nozzle_temp": 210,
+    "bed_temp": 60,
+    "layer_height": 0.2,
+    "print_speed": 60,
+    "retraction_distance": 5.0,
+    "retraction_speed": 45,
+    "fan_speed": 100
+  },
+  "result": {
+    "quality_score": 8,
+    "defects": ["stringing"],
+    "notes": "실험 결과 메모"
+  },
+  "optimized_params": {
+    "nozzle_temp": 200,
+    "reason": "최적화 이유"
+  }
+}
+```
+
+### 로컬 서버 실행 명령어
+```bash
+# 백엔드 (포트 8000)
+cd 3d-print-research-agent
+C:\Users\thf56\AppData\Local\Programs\Python\Python313\python.exe run.py server
+
+# 프론트엔드 (Vite)
+cd 3d-print-research-agent/frontend
+npm run dev
+```

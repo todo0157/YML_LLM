@@ -185,7 +185,17 @@ function App() {
                 {message.role === 'user' ? '👤' : '🤖'}
               </div>
               <div className="message-content">
-                <ReactMarkdown>{message.content}</ReactMarkdown>
+                <ReactMarkdown
+                  components={{
+                    a: ({ href, children }) => (
+                      <a href={href} target="_blank" rel="noopener noreferrer">
+                        {typeof children === 'string' && children.startsWith('http') && children.length > 40
+                          ? children.substring(0, 40) + '...'
+                          : children}
+                      </a>
+                    )
+                  }}
+                >{message.content}</ReactMarkdown>
                 {message.sources && message.sources.length > 0 && (
                   <div className="sources">
                     <strong>참고 소스:</strong>

@@ -199,6 +199,9 @@
   background: #1e293b;
   color: #e2e8f0;
   line-height: 1.6;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  word-break: break-word;
 }
 
 .message.user .message-content {
@@ -312,10 +315,18 @@
 .sources a {
   color: #00d4ff;
   text-decoration: none;
+  word-break: break-all;
+  overflow-wrap: break-word;
 }
 
 .sources a:hover {
   text-decoration: underline;
+}
+
+/* 마크다운 내 긴 링크 처리 */
+.message-content a {
+  word-break: break-all;
+  overflow-wrap: break-word;
 }
 
 /* Spinner */
