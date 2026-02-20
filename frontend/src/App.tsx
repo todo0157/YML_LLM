@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { Send, Loader2, Settings, Trash2, ChevronRight } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
+import rehypeRaw from 'rehype-raw'
 import './App.css'
 
 interface Message {
@@ -235,12 +236,11 @@ function App() {
                   ) : (
                     <>
                       <ReactMarkdown
+                        rehypePlugins={[rehypeRaw]}
                         components={{
                           a: ({ href, children }) => (
-                            <a href={href} target="_blank" rel="noopener noreferrer">
-                              {typeof children === 'string' && children.startsWith('http') && children.length > 40
-                                ? children.substring(0, 40) + '...'
-                                : children}
+                            <a href={href} target="_blank" rel="noopener noreferrer" className="source-link">
+                              {children}
                             </a>
                           )
                         }}

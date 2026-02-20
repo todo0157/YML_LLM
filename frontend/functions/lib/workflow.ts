@@ -304,50 +304,51 @@ function validateRecommendations(
 
 /**
  * 문장 전체를 클릭 가능한 하이퍼링크로 변환
- * 입력: "PLA는 좋은 재료입니다.[1] 온도는 200°C입니다.[2]"
- * 출력: "[PLA는 좋은 재료입니다.](url1) [온도는 200°C입니다.](url2)"
+ * 각 문장을 마침표 기준으로 분리하고, [번호] 출처가 있으면 해당 문장을 링크로 변환
  */
 function convertSentencesToLinks(text: string, sources: SourceInfo[]): string {
-  // 문장 단위로 분리하여 처리
-  // 패턴: 텍스트 + 마침표류(선택) + [숫자] 조합
-  const pattern = /([^[\]]+?)([.!?])?(\[(\d+)\](?:\[(\d+)\])?(?:\[(\d+)\])?)/g;
+  // 문장 끝에 붙은 [1], [2] 등을 찾아서 해당 문장을 링크로 변환
+  // 패턴: 문장 내용 + [숫자] (연속 가능)
 
-  return text.replace(pattern, (match, sentence, punctuation, fullCitation, num1, num2, num3) => {
-    if (!num1) return match;
+  let result = text;
 
-    const primaryIndex = parseInt(num1, 10) - 1;
-    const source = sources[primaryIndex];
-    const cleanSentence = (sentence + (punctuation || '')).trim();
+  // 먼저 모든 [숫자] 패턴과 그 앞의 문장을 찾음
+  // 한국어 문장은 마침표, 쉼표, 또는 문장 구분자로 끝남
+  const citationPattern = /([^.!?\n\[\]]{10,}[.!?]?)\s*(\[(\d+)\](?:\s*\[(\d+)\])?(?:\s*\[(\d+)\])?)/g;
 
+  result = result.replace(citationPattern, (match, sentence, citations, num1, num2, num3) => {
+    const nums = [num1, num2, num3].filter(Boolean).map(n => parseInt(n, 10));
+    if (nums.length === 0) return match;
+
+    const cleanSentence = sentence.trim();
     if (!cleanSentence) return match;
 
-    if (source && !source.isInternal && source.url) {
-      // 외부 소스: 문장 전체를 클릭 가능한 링크로
-      const otherNums = [num2, num3].filter(Boolean);
-      const otherRefs = otherNums.length > 0 ? ' ' + otherNums.map(n => `[[${n}]](${sources[parseInt(n, 10) - 1]?.url || '#'})`).join(' ') : '';
-      return `[${cleanSentence}](${source.url})${otherRefs}`;
-    } else if (source && source.isInternal) {
-      // 내부 소스: 문장에 소스 이름 표시
-      const refNums = [num1, num2, num3].filter(Boolean).map(n => `[${n}]`).join('');
-      return `${cleanSentence} *(${source.title})*`;
+    // 첫 번째 외부 소스 URL 찾기
+    let linkUrl: string | null = null;
+    let linkSourceTitle: string | null = null;
+
+    for (const num of nums) {
+      const source = sources[num - 1];
+      if (source && !source.isInternal && source.url) {
+        linkUrl = source.url;
+        break;
+      } else if (source && source.isInternal) {
+        linkSourceTitle = source.title;
+      }
+    }
+
+    if (linkUrl) {
+      // 외부 URL이 있으면 문장 전체를 클릭 가능한 링크로 변환
+      return `<a href="${linkUrl}" target="_blank" class="source-link">${cleanSentence}</a>`;
+    } else if (linkSourceTitle) {
+      // 내부 소스만 있으면 출처명 표시
+      return `${cleanSentence} <span class="kb-source">[${linkSourceTitle}]</span>`;
     }
 
     return match;
   });
-}
 
-/**
- * [1], [2] 형식의 단순 인용을 링크로 변환 (테이블 등에서 사용)
- */
-function convertSimpleCitations(text: string, sources: SourceInfo[]): string {
-  return text.replace(/\[(\d+)\]/g, (match, num) => {
-    const index = parseInt(num, 10) - 1;
-    const source = sources[index];
-    if (source && !source.isInternal) {
-      return `[[${num}]](${source.url})`;
-    }
-    return `[${num}]`;
-  });
+  return result;
 }
 
 /**

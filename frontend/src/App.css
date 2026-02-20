@@ -681,6 +681,45 @@ body {
   overflow-wrap: break-word;
 }
 
+/* Source Links - 클릭 가능한 출처 문장 */
+.source-link {
+  color: var(--primary);
+  text-decoration: none;
+  border-bottom: 1px dashed var(--primary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.source-link:hover {
+  background-color: rgba(0, 57, 118, 0.1);
+  border-bottom-style: solid;
+}
+
+@media (prefers-color-scheme: dark) {
+  .source-link {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+
+  .source-link:hover {
+    background-color: rgba(0, 169, 224, 0.15);
+  }
+}
+
+/* Knowledge Base Source */
+.kb-source {
+  font-size: 0.85em;
+  color: var(--text-muted-light);
+  font-style: italic;
+  margin-left: 0.25rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  .kb-source {
+    color: var(--text-muted-dark);
+  }
+}
+
 /* Spinner */
 .spinner {
   animation: spin 1s linear infinite;

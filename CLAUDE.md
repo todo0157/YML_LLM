@@ -340,6 +340,72 @@ npm run preview   # Wrangler로 로컬 테스트
 ```
 
 ### 다음 작업
-1. Cloudflare Pages에 배포 및 환경변수 설정
-2. 프로덕션 환경 테스트
-3. CSV 데이터를 Knowledge Base에 추가
+1. CSV 데이터를 Knowledge Base에 추가
+
+---
+
+## Session Update (2026-02-20 오후)
+
+### 완료된 작업
+
+#### 1. 성능 최적화
+- LLM 호출 3회 → 1회로 최적화
+- 쿼리 분석을 로컬 키워드 매칭으로 대체 (LLM 호출 제거)
+- 웹 검색 결과 수 축소 (5개 → 3개)
+
+#### 2. 출처 인용 기능 구현
+- **문장별 클릭 가능한 하이퍼링크**: 웹 출처가 있는 문장 클릭 시 해당 사이트로 이동
+- **지식베이스 출처 표시**: `[PLA 가이드]` 형식으로 표시
+- rehype-raw 패키지 추가하여 HTML 렌더링 지원
+
+#### 3. UI 스타일 추가
+- `.source-link`: 클릭 가능한 출처 문장 (파란색 + 점선 밑줄)
+- `.kb-source`: 지식베이스 출처 (회색 이탤릭)
+
+### 기술 변경 사항
+
+**workflow.ts 변경:**
+```typescript
+// 문장을 HTML 링크로 변환
+<a href="url" target="_blank" class="source-link">클릭 가능한 문장</a>
+<span class="kb-source">[지식베이스 출처]</span>
+```
+
+**App.tsx 변경:**
+```typescript
+import rehypeRaw from 'rehype-raw'
+
+<ReactMarkdown rehypePlugins={[rehypeRaw]}>
+  {message.content}
+</ReactMarkdown>
+```
+
+**App.css 추가:**
+```css
+.source-link {
+  color: var(--primary);
+  border-bottom: 1px dashed var(--primary);
+  cursor: pointer;
+}
+
+.kb-source {
+  font-style: italic;
+  color: var(--text-muted);
+}
+```
+
+### 새로 설치된 패키지
+- `rehype-raw`: ReactMarkdown에서 HTML 태그 렌더링 지원
+
+### 배포 URL
+- **프로덕션**: https://3d-print-agent.pages.dev
+- **GitHub**: https://github.com/todo0157/YML_LLM
+
+### 로컬 테스트 명령어
+```bash
+cd frontend
+npm install
+npm run build
+npx wrangler pages dev dist --port 8788
+# 브라우저: http://localhost:8788
+```
