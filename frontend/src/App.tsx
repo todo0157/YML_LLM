@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Send, Loader2, Settings, Trash2, Printer } from 'lucide-react'
+import { Send, Loader2, Settings, Trash2, ChevronRight } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import './App.css'
 
@@ -9,6 +9,7 @@ interface Message {
   content: string
   timestamp: Date
   sources?: string[]
+  isWelcome?: boolean
 }
 
 interface ApiConfig {
@@ -16,20 +17,27 @@ interface ApiConfig {
   isConnected: boolean
 }
 
+const EXAMPLE_QUESTIONS = [
+  "MEMS 센서 제작 공정 중 에칭 속도 최적화 방법",
+  "PLA 최적 온도와 속도 설정 알려주세요",
+  "PETG stringing 해결 방법"
+]
+
 function App() {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '0',
       role: 'assistant',
-      content: '안녕하세요! 3D 프린팅 전문 AI 어시스턴트입니다. 🖨️\n\n프린팅 관련 문제나 최적 파라미터에 대해 질문해주세요.\n\n**예시 질문:**\n- "PETG로 출력 중 stringing이 심해요"\n- "ABS 워핑 해결 방법"\n- "PLA 최적 온도 설정"',
-      timestamp: new Date()
+      content: '',
+      timestamp: new Date(),
+      isWelcome: true
     }
   ])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [config, setConfig] = useState<ApiConfig>({
-    endpoint: import.meta.env.VITE_API_ENDPOINT || 'http://localhost:8000',
+    endpoint: import.meta.env.VITE_API_ENDPOINT || '/api',
     isConnected: false
   })
 
@@ -51,6 +59,11 @@ function App() {
     } catch {
       setConfig(prev => ({ ...prev, isConnected: false }))
     }
+  }
+
+  const handleExampleClick = (question: string) => {
+    setInput(question)
+    inputRef.current?.focus()
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -98,7 +111,7 @@ function App() {
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: `⚠️ 오류가 발생했습니다.\n\n${config.isConnected ? '서버 처리 중 오류가 발생했습니다.' : '서버에 연결할 수 없습니다. 설정에서 API 엔드포인트를 확인해주세요.'}\n\n**해결 방법:**\n1. 백엔드 서버가 실행 중인지 확인\n2. API 엔드포인트 주소 확인\n3. 네트워크 연결 확인`,
+        content: `⚠️ 오류가 발생했습니다.\n\n${config.isConnected ? '서버 처리 중 오류가 발생했습니다.' : '서버에 연결할 수 없습니다.'}\n\n**해결 방법:**\n1. 네트워크 연결 확인\n2. 잠시 후 다시 시도`,
         timestamp: new Date()
       }
       setMessages(prev => [...prev, errorMessage])
@@ -118,24 +131,51 @@ function App() {
     setMessages([{
       id: '0',
       role: 'assistant',
-      content: '대화가 초기화되었습니다. 새로운 질문을 해주세요! 🖨️',
-      timestamp: new Date()
+      content: '',
+      timestamp: new Date(),
+      isWelcome: true
     }])
   }
+
+  const renderWelcomeMessage = () => (
+    <>
+      <p style={{ fontWeight: 500, marginBottom: '0.75rem' }}>
+        안녕하세요! 연세 마이크로시스템 연구실(YML) AI 어시스턴트입니다. 👋
+      </p>
+      <p style={{ marginBottom: '1rem' }} className="text-muted">
+        연구 논문 분석, 3D 프린팅 최적화, 실험 데이터 처리 등 다양한 질문에 답해드릴 수 있습니다.
+      </p>
+      <div className="example-questions">
+        <p>예시 질문:</p>
+        {EXAMPLE_QUESTIONS.map((q, idx) => (
+          <div
+            key={idx}
+            className="example-item"
+            onClick={() => handleExampleClick(q)}
+          >
+            <ChevronRight size={16} />
+            <span>{q}</span>
+          </div>
+        ))}
+      </div>
+    </>
+  )
 
   return (
     <div className="app">
       <header className="header">
         <div className="header-left">
-          <Printer size={28} />
-          <div>
-            <h1>3D Print Research Agent</h1>
-            <span className="subtitle">Autonomous AI Assistant</span>
+          <div className="header-icon">
+            <span className="material-symbols-outlined">school</span>
+          </div>
+          <div className="header-text">
+            <h1>YML Research Assistant</h1>
+            <p className="subtitle">Yonsei Microsystem Laboratory AI</p>
           </div>
         </div>
         <div className="header-right">
           <span className={`status ${config.isConnected ? 'connected' : 'disconnected'}`}>
-            {config.isConnected ? '● 연결됨' : '○ 연결 안됨'}
+            {config.isConnected ? '연결됨' : '연결 안됨'}
           </span>
           <button
             className="icon-btn"
@@ -164,7 +204,7 @@ function App() {
                 type="text"
                 value={config.endpoint}
                 onChange={(e) => setConfig(prev => ({ ...prev, endpoint: e.target.value }))}
-                placeholder="http://localhost:8000"
+                placeholder="/api"
               />
             </label>
             <button onClick={checkConnection} className="check-btn">
@@ -182,36 +222,48 @@ function App() {
               className={`message ${message.role}`}
             >
               <div className="message-avatar">
-                {message.role === 'user' ? '👤' : '🤖'}
-              </div>
-              <div className="message-content">
-                <ReactMarkdown
-                  components={{
-                    a: ({ href, children }) => (
-                      <a href={href} target="_blank" rel="noopener noreferrer">
-                        {typeof children === 'string' && children.startsWith('http') && children.length > 40
-                          ? children.substring(0, 40) + '...'
-                          : children}
-                      </a>
-                    )
-                  }}
-                >{message.content}</ReactMarkdown>
-                {message.sources && message.sources.length > 0 && (
-                  <div className="sources">
-                    <strong>참고 소스:</strong>
-                    <ul>
-                      {message.sources.slice(0, 3).map((src, idx) => (
-                        <li key={idx}>
-                          <a href={src} target="_blank" rel="noopener noreferrer">
-                            {src.length > 50 ? src.substring(0, 50) + '...' : src}
-                          </a>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
+                {message.role === 'user' ? (
+                  '👤'
+                ) : (
+                  <span className="material-symbols-outlined">smart_toy</span>
                 )}
+              </div>
+              <div className="message-wrapper">
+                <div className="message-content">
+                  {message.isWelcome ? (
+                    renderWelcomeMessage()
+                  ) : (
+                    <>
+                      <ReactMarkdown
+                        components={{
+                          a: ({ href, children }) => (
+                            <a href={href} target="_blank" rel="noopener noreferrer">
+                              {typeof children === 'string' && children.startsWith('http') && children.length > 40
+                                ? children.substring(0, 40) + '...'
+                                : children}
+                            </a>
+                          )
+                        }}
+                      >{message.content}</ReactMarkdown>
+                      {message.sources && message.sources.length > 0 && (
+                        <div className="sources">
+                          <strong>참고 소스:</strong>
+                          <ul>
+                            {message.sources.slice(0, 3).map((src, idx) => (
+                              <li key={idx}>
+                                <a href={src} target="_blank" rel="noopener noreferrer">
+                                  {src.length > 50 ? src.substring(0, 50) + '...' : src}
+                                </a>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
                 <span className="timestamp">
-                  {message.timestamp.toLocaleTimeString()}
+                  {message.timestamp.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
                 </span>
               </div>
             </div>
@@ -219,10 +271,14 @@ function App() {
 
           {isLoading && (
             <div className="message assistant">
-              <div className="message-avatar">🤖</div>
-              <div className="message-content loading">
-                <Loader2 className="spinner" size={20} />
-                <span>연구 중... 웹 검색, 논문 분석, 지식베이스 조회</span>
+              <div className="message-avatar">
+                <span className="material-symbols-outlined">smart_toy</span>
+              </div>
+              <div className="message-wrapper">
+                <div className="message-content loading">
+                  <Loader2 className="spinner" size={20} />
+                  <span>연구 중... 웹 검색, 지식베이스 조회</span>
+                </div>
               </div>
             </div>
           )}
@@ -238,7 +294,7 @@ function App() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="3D 프린팅 관련 질문을 입력하세요... (Shift+Enter: 줄바꿈)"
+            placeholder="연구 관련 질문을 입력하세요... (Shift+Enter: 줄바꿈)"
             disabled={isLoading}
             rows={1}
           />
@@ -247,11 +303,11 @@ function App() {
             disabled={!input.trim() || isLoading}
             className="send-btn"
           >
-            {isLoading ? <Loader2 className="spinner" size={20} /> : <Send size={20} />}
+            {isLoading ? <Loader2 className="spinner" size={20} /> : <Send size={18} />}
           </button>
         </form>
         <p className="disclaimer">
-          AI가 생성한 응답입니다. 중요한 결정 전에 검증해주세요.
+          AI가 생성한 응답입니다. 중요한 결정 전에 검증해주세요. | Yonsei Microsystem Laboratory
         </p>
       </footer>
     </div>

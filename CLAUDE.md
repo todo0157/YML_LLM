@@ -261,3 +261,85 @@ C:\Users\thf56\AppData\Local\Programs\Python\Python313\python.exe run.py server
 cd 3d-print-research-agent/frontend
 npm run dev
 ```
+
+---
+
+## Session Update (2026-02-20)
+
+### Cloudflare Workers 전환 완료!
+
+**Render 백엔드 → Cloudflare Pages Functions로 전환**
+
+### 변경된 아키텍처
+| 구성 요소 | 이전 | 이후 |
+|-----------|------|------|
+| 백엔드 | Render (Python/FastAPI) | Cloudflare Pages Functions (TypeScript) |
+| 프론트엔드 | Cloudflare Pages | Cloudflare Pages (동일) |
+| API 경로 | https://yml-llm.onrender.com/research | /api/research (같은 도메인) |
+
+### 장점
+- **슬립 모드 없음**: Render 무료 플랜의 15분 비활성 슬립 문제 해결
+- **빠른 응답**: 전세계 엣지에서 실행
+- **단일 도메인**: CORS 설정 불필요
+- **무료**: Cloudflare Workers 무료 플랜 사용
+
+### 새로 추가된 파일
+```
+frontend/
+├── lib/                       # 새로 추가 - 공유 로직
+│   ├── types.ts               # TypeScript 타입 정의
+│   ├── gemini.ts              # Gemini API 클라이언트
+│   ├── tavily.ts              # Tavily 검색 API
+│   ├── knowledge-base.ts      # 지식베이스 (Python → TS 변환)
+│   ├── prompts.ts             # 프롬프트 템플릿
+│   └── workflow.ts            # 워크플로우 (LangGraph → 직접 구현)
+├── functions/                 # 새로 추가 - API 핸들러
+│   └── api/
+│       ├── health.ts          # GET /api/health
+│       ├── research.ts        # POST /api/research
+│       └── materials/
+│           ├── index.ts       # GET /api/materials
+│           └── [material].ts  # GET /api/materials/:material
+├── wrangler.toml              # Cloudflare 설정 (업데이트)
+├── tsconfig.worker.json       # Workers용 TypeScript 설정
+└── .dev.vars                  # 로컬 개발용 환경변수 (git ignored)
+```
+
+### 로컬 테스트 결과
+```bash
+# 헬스 체크
+curl http://localhost:8788/api/health
+# 응답: {"status":"healthy"}
+
+# 연구 API
+curl -X POST http://localhost:8788/api/research -d '{"query": "PLA 최적 온도"}'
+# 응답: 상세한 파라미터 추천 (성공!)
+```
+
+### 배포 방법
+```bash
+cd frontend
+
+# 1. 빌드
+npm run build
+
+# 2. 배포 (Cloudflare 로그인 필요)
+npm run deploy
+```
+
+### Cloudflare 환경변수 설정 (필수!)
+Cloudflare Dashboard > Pages > 3d-print-agent > Settings > Environment variables:
+- `GOOGLE_API_KEY`: Gemini API 키
+- `TAVILY_API_KEY`: Tavily 웹 검색 API 키
+
+### 로컬 개발 명령어
+```bash
+cd frontend
+npm install
+npm run preview   # Wrangler로 로컬 테스트
+```
+
+### 다음 작업
+1. Cloudflare Pages에 배포 및 환경변수 설정
+2. 프로덕션 환경 테스트
+3. CSV 데이터를 Knowledge Base에 추가

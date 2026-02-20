@@ -51,3 +51,6 @@ Thumbs.db
 *.bin
 models/
 checkpoints/
+
+# Exception for Cloudflare Functions lib
+!frontend/functions/lib/
