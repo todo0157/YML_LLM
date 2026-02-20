@@ -131,15 +131,19 @@ async function performSearch(
 // 통합 프롬프트 (쿼리 분석 + 종합 + 추천 생성을 한 번에)
 const UNIFIED_SYNTHESIS_PROMPT = `당신은 3D 프린팅 전문가입니다. 아래 질문과 검색 결과를 바탕으로 실용적인 답변을 제공하세요.
 
-## 중요: 출처 인용 규칙
-- 답변에서 정보를 인용할 때 반드시 [1], [2] 형식으로 출처 번호를 표시하세요
-- 예: "PLA의 최적 노즐 온도는 200-210°C입니다 [1]."
-- 각 추천의 reasoning에도 출처 번호를 포함하세요
+## 매우 중요: 문장별 출처 인용 규칙
+- 각 문장 끝에 해당 정보의 출처 번호를 반드시 표시하세요
+- 형식: "문장 내용입니다.[1]" (문장 바로 뒤에 [번호] 붙이기)
+- 한 문장에 여러 출처가 있으면: "문장 내용입니다.[1][2]"
+- 출처가 없는 일반적인 설명은 출처 번호 없이 작성
+
+예시:
+"PLA는 3D 프린팅에서 가장 보편적인 재료입니다.[1] 노즐 온도는 190-220°C가 권장됩니다.[2] 특히 210°C에서 최적의 결과를 얻을 수 있습니다.[1][3]"
 
 ## 답변 형식
 JSON 형식으로 응답하세요:
 {
-  "synthesis": "문제 분석과 해결책 (반드시 [1], [2] 형식의 인라인 출처 포함)",
+  "synthesis": "문제 분석 (각 문장 끝에 [1], [2] 형식의 출처 번호 포함)",
   "recommendations": [
     {
       "parameter": "파라미터 이름 (한글)",
@@ -147,16 +151,16 @@ JSON 형식으로 응답하세요:
       "recommended_value": "추천값 (단위 포함)",
       "confidence": 0.0~1.0 사이 신뢰도,
       "source_indices": [1, 2],
-      "reasoning": "이 추천 이유 [1]"
+      "reasoning": "이 추천 이유 (문장별 출처 포함)[1]"
     }
   ]
 }
 
 ## 규칙
-1. 검색 결과를 활용하여 구체적인 수치를 제공
-2. 모든 주장에는 출처 번호 [1], [2] 등을 반드시 포함
-3. synthesis는 2-3문단으로 핵심만 설명
-4. recommendations는 3-5개 이내로 중요한 것만`;
+1. 모든 구체적인 수치나 주장에는 반드시 문장 끝에 출처 번호 [1], [2] 등을 포함
+2. synthesis는 2-3문단으로 핵심만 설명
+3. recommendations는 3-5개 이내로 중요한 것만
+4. 각 reasoning도 문장별로 출처 표시`;
 
 // 소스 정보 타입
 interface SourceInfo {
@@ -299,21 +303,50 @@ function validateRecommendations(
 }
 
 /**
- * [1], [2] 형식의 인용을 클릭 가능한 마크다운 링크로 변환
+ * 문장 전체를 클릭 가능한 하이퍼링크로 변환
+ * 입력: "PLA는 좋은 재료입니다.[1] 온도는 200°C입니다.[2]"
+ * 출력: "[PLA는 좋은 재료입니다.](url1) [온도는 200°C입니다.](url2)"
  */
-function convertCitationsToLinks(text: string, sources: SourceInfo[]): string {
-  // [1], [2], [3] 등을 마크다운 링크로 변환
+function convertSentencesToLinks(text: string, sources: SourceInfo[]): string {
+  // 문장 단위로 분리하여 처리
+  // 패턴: 텍스트 + 마침표류(선택) + [숫자] 조합
+  const pattern = /([^[\]]+?)([.!?])?(\[(\d+)\](?:\[(\d+)\])?(?:\[(\d+)\])?)/g;
+
+  return text.replace(pattern, (match, sentence, punctuation, fullCitation, num1, num2, num3) => {
+    if (!num1) return match;
+
+    const primaryIndex = parseInt(num1, 10) - 1;
+    const source = sources[primaryIndex];
+    const cleanSentence = (sentence + (punctuation || '')).trim();
+
+    if (!cleanSentence) return match;
+
+    if (source && !source.isInternal && source.url) {
+      // 외부 소스: 문장 전체를 클릭 가능한 링크로
+      const otherNums = [num2, num3].filter(Boolean);
+      const otherRefs = otherNums.length > 0 ? ' ' + otherNums.map(n => `[[${n}]](${sources[parseInt(n, 10) - 1]?.url || '#'})`).join(' ') : '';
+      return `[${cleanSentence}](${source.url})${otherRefs}`;
+    } else if (source && source.isInternal) {
+      // 내부 소스: 문장에 소스 이름 표시
+      const refNums = [num1, num2, num3].filter(Boolean).map(n => `[${n}]`).join('');
+      return `${cleanSentence} *(${source.title})*`;
+    }
+
+    return match;
+  });
+}
+
+/**
+ * [1], [2] 형식의 단순 인용을 링크로 변환 (테이블 등에서 사용)
+ */
+function convertSimpleCitations(text: string, sources: SourceInfo[]): string {
   return text.replace(/\[(\d+)\]/g, (match, num) => {
     const index = parseInt(num, 10) - 1;
     const source = sources[index];
     if (source && !source.isInternal) {
-      // 외부 소스는 클릭 가능한 링크로
       return `[[${num}]](${source.url})`;
-    } else if (source && source.isInternal) {
-      // 내부 소스는 번호만 유지 (아래 참고 소스에서 확인)
-      return `[${num}]`;
     }
-    return match;
+    return `[${num}]`;
   });
 }
 
@@ -327,8 +360,8 @@ function generateOutput(state: AgentState, sources: SourceInfo[]): string {
   const externalSources = sources.filter(s => !s.isInternal);
   const internalSources = sources.filter(s => s.isInternal);
 
-  // synthesis의 [1], [2] 등을 클릭 가능한 링크로 변환
-  const synthesisWithLinks = convertCitationsToLinks(synthesizedKnowledge || '', sources);
+  // synthesis의 문장들을 클릭 가능한 링크로 변환
+  const synthesisWithLinks = convertSentencesToLinks(synthesizedKnowledge || '', sources);
 
   // 추천 테이블
   let recTable: string;
@@ -343,10 +376,10 @@ function generateOutput(state: AgentState, sources: SourceInfo[]): string {
     recTable = '추천을 생성할 수 없습니다.';
   }
 
-  // 상세 설명 (인용 링크 변환)
+  // 상세 설명 (문장별 링크 변환)
   const detailed = recommendations
     .slice(0, 5)
-    .map((r) => `**${r.parameter}**: ${convertCitationsToLinks(r.reasoning, sources)}`)
+    .map((r) => `**${r.parameter}**: ${convertSentencesToLinks(r.reasoning, sources)}`)
     .join('\n\n');
 
   // 소스 포맷
